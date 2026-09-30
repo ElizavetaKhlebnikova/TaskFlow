@@ -8,8 +8,8 @@ from user.models import ProjectMember, Role
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
-        fields = ['id', 'name', 'description', 'owner']
-        read_only_fields = ['owner']
+        fields = ['id', 'name', 'description', 'owner', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
 
     def create(self, validated_data):
         request = self.context["request"]

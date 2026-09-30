@@ -21,9 +21,16 @@ from rest_framework import routers
 from project.views import ProjectView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+router = routers.DefaultRouter()
+router.register(
+    "api/projects",
+    ProjectView,
+    basename="projects"
+)
+
 urlpatterns = [
+    path('', include(router.urls)),
     path('admin/', admin.site.urls),
     path("api/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/refresh_token/", TokenRefreshView.as_view(), name="refresh_token"),
-    path('api/projects/', ProjectView.as_view()),
 ]
