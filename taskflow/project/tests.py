@@ -402,3 +402,123 @@ def test_project_list_search_with_role(authenticated_client_alice, user_alice):
     )
     assert response.data['count'] == 1
     assert response.data['results'][0]['id'] == project_yandex.pk
+
+
+@pytest.mark.django_db
+def test_get_project(authenticated_client_alice, user_alice):
+    project = Project.objects.create(name='Test project', description='test project')
+
+    response = authenticated_client_alice.get(
+        f"/api/projects/{project.pk}/", format="json"
+    )
+    assert response.status_code == 403
+    ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+
+    response = authenticated_client_alice.get(
+        f"/api/projects/{project.pk}/", format="json"
+    )
+    assert response.status_code == 200
+    assert response.data['id'] == project.pk
+
+
+@pytest.mark.django_db
+def test_partly_update_project(authenticated_client_alice, user_alice):
+    project = Project.objects.create(name='Test project', description='test project')
+    member = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    new_description = 'updated'
+
+    response = authenticated_client_alice.patch(
+        f"/api/projects/{project.pk}/",
+        {
+            "description": new_description
+        },
+        format="json"
+    )
+    assert response.status_code == 403
+
+    member.delete()
+
+    ProjectMember.objects.create(project=project, user=user_alice, role=Role.MANAGER)
+    response = authenticated_client_alice.patch(
+        f"/api/projects/{project.pk}/",
+        {
+            "description": new_description
+        },
+        format="json"
+    )
+    assert response.status_code == 200
+    assert response.data['id'] == project.pk
+    assert response.data['description'] == new_description
+
+
+@pytest.mark.django_db
+def test_update_project(authenticated_client_alice, user_alice):
+    project = Project.objects.create(name='Test project', description='test project')
+    member = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    new_description = 'updated'
+
+    response = authenticated_client_alice.put(
+        f"/api/projects/{project.pk}/",
+        {
+            "name": "Test project",
+            "description": new_description
+        },
+        format="json"
+    )
+    assert response.status_code == 403
+
+    response = authenticated_client_alice.get(
+        f"/api/projects/{project.pk}/", format="json"
+    )
+    last_update = response.data['updated_at']
+
+    member.delete()
+    ProjectMember.objects.create(project=project, user=user_alice, role=Role.MANAGER)
+
+    response = authenticated_client_alice.put(
+        f"/api/projects/{project.pk}/",
+        {
+            "name": "Test project",
+            "description": new_description
+        },
+        format="json"
+    )
+    assert response.status_code == 200
+    assert response.data['id'] == project.pk
+    assert response.data['description'] == new_description
+    assert response.data['updated_at'] != last_update
+
+
+@pytest.mark.django_db
+def test_project_owner_is_read_only(authenticated_client_alice, user_alice, user_bob):
+    project = Project.objects.create(name='Test project', description='test project', owner=user_alice)
+    ProjectMember.objects.create(project=project, user=user_alice, role=Role.MANAGER)
+    response = authenticated_client_alice.patch(
+        f"/api/projects/{project.pk}/",
+        {
+            "owner": user_bob.pk
+        },
+        format="json"
+    )
+    assert response.status_code == 200
+    assert response.data['id'] == project.pk
+    assert response.data['owner'] == user_alice.pk
+
+
+@pytest.mark.django_db
+def test_delete_project(authenticated_client_alice, user_alice):
+    project = Project.objects.create(name='Test project', description='test project')
+
+    response = authenticated_client_alice.delete(
+        f"/api/projects/{project.pk}/",
+        format="json"
+    )
+    assert response.status_code == 403
+
+    Project.objects.filter(id=project.pk).update(owner=user_alice)
+
+    response = authenticated_client_alice.delete(
+        f"/api/projects/{project.pk}/",
+        format="json"
+    )
+    assert response.status_code == 204
