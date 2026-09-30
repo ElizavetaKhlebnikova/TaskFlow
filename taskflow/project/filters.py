@@ -1,8 +1,5 @@
 import django_filters
-from django_filters import CharFilter
-
 from .models import Project
-from user.models import Role
 
 
 ROLE_FILTER_CHOICES = (
