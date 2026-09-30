@@ -16,21 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework import routers
 
-from project.views import ProjectView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-router = routers.DefaultRouter()
-router.register(
-    "api/projects",
-    ProjectView,
-    basename="projects"
-)
-
 urlpatterns = [
-    path('', include(router.urls)),
     path('admin/', admin.site.urls),
+    path('api/', include('api.urls')),
     path("api/token/", TokenObtainPairView.as_view(), name="token"),
     path("api/refresh_token/", TokenRefreshView.as_view(), name="refresh_token"),
 ]
