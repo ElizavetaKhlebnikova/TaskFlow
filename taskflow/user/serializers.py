@@ -7,3 +7,12 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
         model = ProjectMember
         fields = ['id', 'user', 'project', 'role']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None:
+            self.fields['user'].read_only = True
+            self.fields['project'].read_only = True
+
+
+

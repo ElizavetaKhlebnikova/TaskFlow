@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import permissions
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin, UpdateModelMixin
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -34,7 +35,7 @@ class IsMember(permissions.BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        if request.method == "DELETE":
+        if request.method in {"DELETE", "PATCH"}:
             project_id = obj.project.id
             return self.get_role_in_project(project_id, request.user) == Role.MANAGER
 
@@ -45,7 +46,8 @@ class IsMember(permissions.BasePermission):
             return member.role
 
 
-class ProjectMemberView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet):
+class ProjectMemberView(CreateModelMixin, ListModelMixin,
+                        DestroyModelMixin, GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsMember]
     serializer_class = ProjectMemberSerializer
@@ -60,3 +62,10 @@ class ProjectMemberView(CreateModelMixin, ListModelMixin, DestroyModelMixin, Gen
         if self.action == 'list':
             return super().filter_queryset(queryset)
         return queryset
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

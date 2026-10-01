@@ -334,3 +334,126 @@ def test_delete_project_member_oneself(user_bob, authenticated_client_bob):
         format='json'
     )
     assert response.status_code == 204
+
+
+@pytest.mark.django_db
+def test_partly_update_project_member_unauthorised():
+    client = APIClient()
+    response = client.patch(
+        f'/api/project-members/10/',
+        {
+            'role': 'member'
+        },
+        format='json'
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_partly_update_project_member_by_member(user_bob, user_alice,
+                                         authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MEMBER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    response = authenticated_client_bob.patch(
+        f'/api/project-members/{alice.pk}/',
+        {
+            'role': 'member'
+        },
+        format='json'
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_partly_update_project_member_by_manager(user_bob: User, user_alice: User,
+                                                 authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+
+    response = authenticated_client_bob.patch(
+        f'/api/project-members/{alice.pk}/',
+        {
+            'role': 'manager'
+        },
+        format='json'
+    )
+    assert response.status_code == 200
+    assert response.data['role'] == 'manager'
+
+    alice.refresh_from_db()
+
+    assert alice.role == Role.MANAGER
+
+
+@pytest.mark.django_db
+def test_update_project_member_forbidden(user_bob: User, user_alice: User,
+                                                 authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+
+    response = authenticated_client_bob.put(
+        f'/api/project-members/{alice.pk}/',
+        {
+            'project': 1,
+            'user': 2,
+            'role': 'manager'
+        },
+        format='json'
+    )
+    assert response.status_code == 405
+
+
+@pytest.mark.django_db
+def test_partly_update_project_member_invalid_role(user_bob, user_alice,
+                                                   authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    response = authenticated_client_bob.patch(
+        f'/api/project-members/{alice.pk}/',
+        {
+            'role': 'invalid'
+        },
+        format='json'
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_partly_update_project_member_invalid_project_member(authenticated_client_bob):
+    response = authenticated_client_bob.patch(
+        f'/api/project-members/99999/',
+        {
+            'role': 'member'
+        },
+        format='json'
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_partly_update_project_member_with_project_and_user(user_bob, user_alice,
+                                                            authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+
+    another_user = User.objects.create_user(username="another_user", password="123456")
+    another_project = Project.objects.create(name='Test project', description='-')
+
+    response = authenticated_client_bob.patch(
+        f'/api/project-members/{alice.pk}/',
+        {
+            'user': another_user.pk,
+            'project': another_project.pk,
+            'role': 'manager'
+        },
+        format='json'
+    )
+    assert response.status_code == 200
+    assert response.data['role'] == 'manager'
+    assert response.data['user'] == user_alice.pk
+    assert response.data['project'] == project.pk
