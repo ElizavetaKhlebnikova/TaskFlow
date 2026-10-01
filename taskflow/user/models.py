@@ -26,3 +26,6 @@ class ProjectMember(models.Model):
             )
         ]
 
+    def __str__(self):
+        return f'{self.user.username} - {self.project.name}: {self.get_role_display()}'
+
