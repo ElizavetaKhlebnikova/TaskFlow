@@ -4,4 +4,4 @@ from .models import ProjectMember
 
 @admin.register(ProjectMember)
 class ProjectMember(admin.ModelAdmin):
-    pass
+    list_display = ['id', 'user', 'project', 'role']
