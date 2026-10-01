@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import permissions
-from rest_framework.mixins import ListModelMixin, CreateModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -31,7 +31,12 @@ class IsMember(permissions.BasePermission):
                 if not project_exists:
                     return True
                 return Project.objects.filter(pk=project_id, members__user=request.user).exists()
-            return True
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        if request.method == "DELETE":
+            project_id = obj.project.id
+            return self.get_role_in_project(project_id, request.user) == Role.MANAGER
 
     @staticmethod
     def get_role_in_project(project_id: int, user: User):
@@ -40,7 +45,7 @@ class IsMember(permissions.BasePermission):
             return member.role
 
 
-class ProjectMemberView(CreateModelMixin, ListModelMixin, GenericViewSet):
+class ProjectMemberView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsMember]
     serializer_class = ProjectMemberSerializer
@@ -51,3 +56,7 @@ class ProjectMemberView(CreateModelMixin, ListModelMixin, GenericViewSet):
         qs = ProjectMember.objects.all()
         return qs
 
+    def filter_queryset(self, queryset):
+        if self.action == 'list':
+            return super().filter_queryset(queryset)
+        return queryset

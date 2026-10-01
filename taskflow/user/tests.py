@@ -262,3 +262,75 @@ def test_create_project_member_wrong_role(user_alice, user_bob,
         format='json'
     )
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_delete_project_member_unauthorised():
+    client = APIClient()
+    response = client.delete(
+        f'/api/project-members/10/',
+        format='json'
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_delete_project_member_by_member(user_bob, user_alice,
+                                         authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MEMBER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    response = authenticated_client_bob.delete(
+        f'/api/project-members/{alice.pk}/',
+        format='json'
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_delete_project_member_by_not_a_member(user_alice,
+                                               authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    response = authenticated_client_bob.delete(
+        f'/api/project-members/{alice.pk}/',
+        format='json'
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_delete_project_member_by_manager(user_bob, user_alice,
+                                          authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    alice = ProjectMember.objects.create(project=project, user=user_alice, role=Role.MEMBER)
+    response = authenticated_client_bob.delete(
+        f'/api/project-members/{alice.pk}/',
+        format='json'
+    )
+    assert response.status_code == 204
+    deleted_member = ProjectMember.objects.filter(pk=alice.pk)
+    assert deleted_member.exists() is False
+
+
+@pytest.mark.django_db
+def test_delete_project_member_not_found(user_bob, authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    response = authenticated_client_bob.delete(
+        f'/api/project-members/999/',
+        format='json'
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_delete_project_member_oneself(user_bob, authenticated_client_bob):
+    project = Project.objects.create(name='Test project', description='-')
+    member = ProjectMember.objects.create(project=project, user=user_bob, role=Role.MANAGER)
+    response = authenticated_client_bob.delete(
+        f'/api/project-members/{member.pk}/',
+        format='json'
+    )
+    assert response.status_code == 204
