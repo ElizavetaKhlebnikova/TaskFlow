@@ -40,6 +40,9 @@ class Task(models.Model):
         verbose_name = 'Задача'
         verbose_name_plural = 'задачи'
 
+    def __str__(self):
+        return f'{self.project}: {self.name}'
+
 
 class Comment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments', verbose_name='Задача')
