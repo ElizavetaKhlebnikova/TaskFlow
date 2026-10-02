@@ -1,3 +1,8 @@
 from django.contrib import admin
-
+from .models import Task
 # Register your models here.
+
+
+@admin.register(Task)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ['id', 'name', 'project', 'author', 'assignee', 'status', 'priority', 'deadline']
