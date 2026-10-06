@@ -1,12 +1,13 @@
 from rest_framework import serializers
 from task.models import Task
+from user.models import ProjectMember
 
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ['id', 'project', 'name', 'description', 'assignee',
-                  'status', 'priority', 'author']
+                  'status', 'priority', 'deadline', 'author']
         read_only_fields = ['id', 'author']
 
     def __init__(self, *args, **kwargs):
@@ -21,3 +22,18 @@ class TaskSerializer(serializers.ModelSerializer):
         task.author = request.user
         task.save(update_fields=['author'])
         return task
+
+    def validate_assignee(self, value):
+        """
+        Check that the blog post is about Django.
+        """
+        if self.instance:
+            project = self.instance.project
+            if not ProjectMember.objects.filter(project=project, user=value).exists():
+                raise serializers.ValidationError("Исполнитель должен быть участником проекта")
+        else:
+            project_id = self.initial_data.get('project')
+            if project_id:
+                if not ProjectMember.objects.filter(project__id=project_id, user=value).exists():
+                    raise serializers.ValidationError("Исполнитель должен быть участником проекта")
+        return value
