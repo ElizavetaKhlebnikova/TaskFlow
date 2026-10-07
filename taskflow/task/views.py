@@ -21,37 +21,48 @@ class TaskPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if not request.user.is_authenticated:
             return False
+
         if request.method in {'POST', 'GET'}:
             project_id = (
                 request.data.get('project')
-                if request.method == "POST"
+                if request.method == 'POST'
                 else request.query_params.get('project')
             )
+
             if project_id:
                 project_exists = Project.objects.filter(pk=project_id).exists()
+
                 if not project_exists:
                     return True
-                return ProjectMember.objects.filter(project__id=project_id,
-                                                    user=request.user).exists()
+
+                return ProjectMember.objects.filter(
+                    project_id=project_id,
+                    user=request.user
+                ).exists()
+
         return True
 
     def has_object_permission(self, request, view, obj: Task):
         member_role = ProjectMember.objects.filter(
-            project__id=obj.project.id,
-            user=request.user
+            project_id=obj.project_id,
+            user=request.user,
         ).values_list('role', flat=True).first()
+
         if member_role is None:
             return False
 
         is_manager = member_role == Role.MANAGER
         is_author_or_assignee = request.user.pk in {
-            obj.author.pk,
-            obj.assignee.pk
+            obj.author_id,
+            obj.assignee_id,
         }
-        if request.method == "PATCH":
+
+        if request.method == 'PATCH':
             return is_manager or is_author_or_assignee
-        if request.method == "DELETE":
-            return is_manager or request.user.pk == obj.author.pk
+
+        if request.method == 'DELETE':
+            return is_manager or request.user.pk == obj.author_id
+
         return True
 
 
