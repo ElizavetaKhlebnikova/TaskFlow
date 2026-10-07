@@ -1,6 +1,6 @@
 import pytest
 from rest_framework.test import APIClient
-from task.models import Project, Task, Status, Priority
+from task.models import Project, Task, Status, Priority, Comment
 from user.models import ProjectMember, Role
 
 from django.contrib.auth.models import User
@@ -117,7 +117,7 @@ def task_todo_high(project, user_member_assignee, user_member_author, manager,
 def task_planed_high_author_is_assignee(project, user_member_author, manager,
                                         member_author):
     return Task.objects.create(project=project,
-                               name="Test task 3",
+                               name="Test task 4",
                                description="-",
                                assignee=user_member_author,
                                status=Status.PLANNED,
@@ -152,3 +152,40 @@ def authenticated_client_not_member(not_member):
     client = APIClient()
     client.force_authenticate(user=not_member)
     return client
+
+
+@pytest.fixture
+def comment_task_by_author(task, user_member_author):
+    return Comment.objects.create(
+        task=task,
+        author=user_member_author,
+        text='Задача готова?'
+    )
+
+
+@pytest.fixture
+def comment_task_by_assignee(task, user_member_assignee):
+    return Comment.objects.create(
+        task=task,
+        author=user_member_assignee,
+        text='нет'
+    )
+
+
+@pytest.fixture
+def comment_task_todo_medium_by_author(task_todo_medium, user_member_author):
+    return Comment.objects.create(
+        task=task_todo_medium,
+        author=user_member_author,
+        text='Задача готова?'
+    )
+
+
+@pytest.fixture
+def comment_task_todo_medium_by_assignee(task_todo_medium, user_member_assignee):
+    return Comment.objects.create(
+        task=task_todo_medium,
+        author=user_member_assignee,
+        text='нет'
+    )
+

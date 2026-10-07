@@ -2,7 +2,7 @@ import django_filters
 from django.contrib.auth.models import User
 
 from project.models import Project
-from .models import Task
+from task.models import Task, Comment
 
 PRIORITY_FILTER_CHOICES = (
     ("low", "Low"),
@@ -27,3 +27,11 @@ class TaskFilter(django_filters.FilterSet):
     class Meta:
         model = Task
         fields = ['project', 'priority', 'status', 'assignee']
+
+
+class CommentFilter(django_filters.FilterSet):
+    task = django_filters.ModelChoiceFilter(queryset=Task.objects.all(), required=True)
+
+    class Meta:
+        model = Comment
+        fields = ['task']

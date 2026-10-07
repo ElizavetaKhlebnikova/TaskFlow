@@ -1,13 +1,13 @@
 from rest_framework import serializers
-from task.models import Task
+from task.models import Task, Comment
 from user.models import ProjectMember
 
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ['id', 'project', 'name', 'description', 'assignee',
-                  'status', 'priority', 'deadline', 'author']
+        fields = ['id', 'project', 'name', 'description', 'assignee', 'status',
+                  'priority', 'deadline', 'author', 'created_at', 'updated_at']
         read_only_fields = ['id', 'author']
 
     def __init__(self, *args, **kwargs):
@@ -37,3 +37,23 @@ class TaskSerializer(serializers.ModelSerializer):
                 if not ProjectMember.objects.filter(project__id=project_id, user=value).exists():
                     raise serializers.ValidationError("Исполнитель должен быть участником проекта")
         return value
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id', 'task', 'author', 'text', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'author']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance is not None:
+            self.fields['task'].read_only = True
+
+    def create(self, validated_data):
+        request = self.context['request']
+        comment = super().create(validated_data)
+        comment.author = request.user
+        comment.save(update_fields=['author'])
+        return comment
