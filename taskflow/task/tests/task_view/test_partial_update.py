@@ -2,7 +2,9 @@ import datetime
 
 import pytest
 from rest_framework.test import APIClient
-from task.models import Project, Status, Priority
+from reversion.models import Version
+
+from task.models import Project, Status, Priority, Task
 
 
 @pytest.mark.django_db
@@ -193,3 +195,55 @@ def test_partial_update_task_assignee_is_not_member(task, authenticated_client_m
 
     assert response.status_code == 400
     assert response.data['assignee'][0] == "Исполнитель должен быть участником проекта"
+
+
+@pytest.mark.django_db
+def test_partial_update_task_versions(
+        authenticated_client_manager,
+        user_member_assignee,
+        user_manager,
+        project,
+        member_assignee,
+        member_author
+):
+    response = authenticated_client_manager.post(
+        f"/api/task/",
+        {
+            "project": project.pk,
+            "name": "Test task 1",
+            "status": Status.TODO,
+            "priority": Priority.HIGH,
+            "description": "Description",
+            "assignee": user_member_assignee.pk,
+        },
+        format="json"
+    )
+
+    assert response.status_code == 201
+    task = Task.objects.get(id=response.data['id'])
+    versions = Version.objects.get_for_object(task)
+    assert len(versions) == 1
+    assert versions[0].revision.user == user_manager
+    assert versions[0].field_dict['name'] == "Test task 1"
+
+    response = authenticated_client_manager.patch(
+        f"/api/task/{task.pk}/",
+        {
+            "name": "Test task 2",
+        },
+        format="json"
+    )
+    assert response.status_code == 200
+    task.refresh_from_db()
+    assert task.name == "Test task 2"
+
+    versions = Version.objects.get_for_object(task)
+    assert len(versions) == 2
+    assert versions[0].revision.user == user_manager
+
+    assert versions[0].field_dict['name'] == "Test task 2"
+    assert versions[1].field_dict['name'] == "Test task 1"
+
+    versions[1].revision.revert()
+    task.refresh_from_db()
+    assert task.name == "Test task 1"

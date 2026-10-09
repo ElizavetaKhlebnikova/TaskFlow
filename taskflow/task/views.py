@@ -1,3 +1,4 @@
+import reversion
 from django_filters import rest_framework as filters
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, \
     DestroyModelMixin
@@ -84,10 +85,17 @@ class TaskView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewS
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        with reversion.create_revision():
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            reversion.set_user(request.user)
         return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        with reversion.create_revision():
+            serializer.save()
+            reversion.set_user(self.request.user)
 
 
 class CommentPermission(permissions.BasePermission):

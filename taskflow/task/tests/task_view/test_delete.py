@@ -1,6 +1,9 @@
 import pytest
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
+from reversion.models import Version
+
+from task.models import Task, Status, Priority
 
 
 @pytest.mark.django_db
@@ -87,3 +90,49 @@ def test_delete_task_invalid_task(authenticated_client_manager):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_delete_task_versions(
+        authenticated_client_manager,
+        user_member_assignee,
+        user_manager,
+        project,
+        member_assignee,
+        member_author
+):
+    response = authenticated_client_manager.post(
+        f"/api/task/",
+        {
+            "project": project.pk,
+            "name": "Test task 1",
+            "status": Status.TODO,
+            "priority": Priority.HIGH,
+            "description": "Description",
+            "assignee": user_member_assignee.pk,
+        },
+        format="json"
+    )
+
+    assert response.status_code == 201
+    task = Task.objects.get(id=response.data['id'])
+    versions = Version.objects.get_for_object(task)
+    assert len(versions) == 1
+    assert versions[0].revision.user == user_manager
+    assert versions[0].field_dict['name'] == "Test task 1"
+
+    task_id = task.id
+    response = authenticated_client_manager.delete(
+        f"/api/task/{task_id}/",
+        format="json"
+    )
+
+    assert response.status_code == 204
+    versions = Version.objects.get_deleted(Task)
+    version = versions.get(object_id=str(task_id))
+    assert version.revision.user == user_manager
+    assert version.field_dict['name'] == "Test task 1"
+
+    version.revert()
+    task = Task.objects.get(id=task_id)
+    assert task.name == "Test task 1"
