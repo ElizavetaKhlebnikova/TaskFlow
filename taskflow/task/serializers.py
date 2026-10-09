@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from reversion.models import Version
+
 from task.models import Task, Comment
 from user.models import ProjectMember
 
@@ -57,3 +59,13 @@ class CommentSerializer(serializers.ModelSerializer):
         comment.author = request.user
         comment.save(update_fields=['author'])
         return comment
+
+
+class TaskHistorySerializer(serializers.ModelSerializer):
+    user = serializers.IntegerField(source='revision.user.pk')
+    date_created = serializers.DateTimeField(source='revision.date_created')
+
+    class Meta:
+        model = Version
+        fields = ['id', 'revision', 'user', 'date_created', 'field_dict']
+        read_only_fields = ['id', 'revision', 'user', 'date_created', 'field_dict']

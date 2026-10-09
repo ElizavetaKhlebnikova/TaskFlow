@@ -1,5 +1,7 @@
 import reversion
 from django_filters import rest_framework as filters
+from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, \
     DestroyModelMixin
 from rest_framework.pagination import PageNumberPagination
@@ -7,11 +9,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.filters import SearchFilter, OrderingFilter
+from reversion.models import Version
 
 from project.models import Project
 from user.models import Role, ProjectMember
 from .filters import TaskFilter, CommentFilter
-from .serializers import TaskSerializer, CommentSerializer
+from .serializers import TaskSerializer, CommentSerializer, TaskHistorySerializer
 
 from .models import Task, Comment
 
@@ -67,6 +70,18 @@ class TaskPermission(permissions.BasePermission):
         return True
 
 
+class TaskHistoryPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return (request.user.is_authenticated
+                and request.method == "GET")
+
+    def has_object_permission(self, request, view, obj: Task):
+        return ProjectMember.objects.filter(
+            project_id=obj.project_id,
+            user=request.user,
+        ).exists()
+
+
 class TaskView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [TaskPermission]
@@ -96,6 +111,13 @@ class TaskView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewS
         with reversion.create_revision():
             serializer.save()
             reversion.set_user(self.request.user)
+
+    @action(detail=True, methods=['get'], permission_classes=[TaskHistoryPermission])
+    def history(self, request, pk=None):
+        task = self.get_object()
+        versions = Version.objects.get_for_object(task)
+        serializer = TaskHistorySerializer(versions, many=True)
+        return Response(serializer.data)
 
 
 class CommentPermission(permissions.BasePermission):

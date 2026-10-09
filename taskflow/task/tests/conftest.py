@@ -189,3 +189,61 @@ def comment_task_todo_medium_by_assignee(task_todo_medium, user_member_assignee)
         text='нет'
     )
 
+
+@pytest.fixture
+def task_history_new_obj(
+        authenticated_client_manager,
+        user_member_assignee,
+        user_manager,
+        project,
+        member_assignee,
+        member_author
+):
+    response = authenticated_client_manager.post(
+        f"/api/task/",
+        {
+            "project": project.pk,
+            "name": "Test task 1",
+            "status": Status.TODO,
+            "priority": Priority.HIGH,
+            "description": "Description",
+            "assignee": user_member_assignee.pk,
+        },
+        format="json"
+    )
+    task = Task.objects.get(id=response.data['id'])
+    return task
+
+
+@pytest.fixture
+def task_with_history(
+        authenticated_client_member_author,
+        user_member_assignee,
+        user_member_author,
+        project,
+        member_assignee,
+        member_author
+):
+    response = authenticated_client_member_author.post(
+        f"/api/task/",
+        {
+            "project": project.pk,
+            "name": "Test task 1",
+            "status": Status.TODO,
+            "priority": Priority.HIGH,
+            "description": "Description",
+            "assignee": user_member_assignee.pk,
+        },
+        format="json"
+    )
+    task = Task.objects.get(id=response.data['id'])
+    response = authenticated_client_member_author.patch(
+        f"/api/task/{task.pk}/",
+        {
+            "name": "Test task 2",
+        },
+        format="json"
+    )
+    assert response.status_code == 200
+    task.refresh_from_db()
+    return task
