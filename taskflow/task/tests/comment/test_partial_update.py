@@ -1,5 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 
 @pytest.mark.django_db
@@ -72,13 +74,19 @@ def test_partial_update_comment_by_not_member_but_author(comment_task_by_author,
 def test_partial_update_comment_by_author(comment_task_by_author, authenticated_client_member_author):
     new_text = "Изменённый комментарий"
 
-    response = authenticated_client_member_author.patch(
-        f"/api/comments/{comment_task_by_author.pk}/",
-        {
-            "text": new_text
-        },
-        format="json"
-    )
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated_client_member_author.patch(
+            f"/api/comments/{comment_task_by_author.pk}/",
+            {
+                "text": new_text
+            },
+            format="json"
+        )
+
+    print(f"Количество запросов: {len(queries)}")
+
+    for query in queries:
+        print(query["sql"])
 
     assert response.status_code == 200
     comment_task_by_author.refresh_from_db()
@@ -133,3 +141,19 @@ def test_partial_update_comment_by_author_invalid_comment(authenticated_client_m
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_partial_update_comment_by_manager(comment_task_by_author,
+                                           authenticated_client_manager):
+    new_text = "Изменённый комментарий"
+
+    response = authenticated_client_manager.patch(
+        f"/api/comments/{comment_task_by_author.pk}/",
+        {
+            "text": new_text
+        },
+        format="json"
+    )
+
+    assert response.status_code == 403

@@ -1,5 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 
 @pytest.mark.django_db
@@ -15,10 +17,16 @@ def test_delete_comment_unauthorised(comment_task_by_author):
 
 @pytest.mark.django_db
 def test_delete_comment_by_author(comment_task_by_author, authenticated_client_member_author):
-    response = authenticated_client_member_author.delete(
-        f"/api/comments/{comment_task_by_author.pk}/",
-        format="json"
-    )
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated_client_member_author.delete(
+            f"/api/comments/{comment_task_by_author.pk}/",
+            format="json"
+        )
+
+    print(f"Количество запросов: {len(queries)}")
+
+    for query in queries:
+        print(query["sql"])
 
     assert response.status_code == 204
 

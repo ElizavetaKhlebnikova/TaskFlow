@@ -1,6 +1,7 @@
 import reversion
 from django_filters import rest_framework as filters
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, \
     DestroyModelMixin
@@ -18,7 +19,7 @@ from .serializers import TaskSerializer, CommentSerializer, TaskHistorySerialize
 
 from .models import Task, Comment
 
-from rest_framework import permissions
+from rest_framework import permissions, status
 
 
 class TaskPermission(permissions.BasePermission):
@@ -115,7 +116,7 @@ class TaskView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewS
     @action(detail=True, methods=['get'], permission_classes=[TaskHistoryPermission])
     def history(self, request, pk=None):
         task = self.get_object()
-        versions = Version.objects.get_for_object(task)
+        versions = Version.objects.get_for_object(task).select_related('revision__user')
         serializer = TaskHistorySerializer(versions, many=True)
         return Response(serializer.data)
 
@@ -130,15 +131,16 @@ class CommentPermission(permissions.BasePermission):
                 if request.method == "GET"
                 else request.data.get('task')
             )
-            if not task_id:
+            if task_id is None or not str(task_id).isnumeric():
                 return True
-            project_id = Task.objects.filter(
-                id=task_id
-            ).values_list('project_id', flat=True).first()
-            if not project_id:
-                return True
-            return ProjectMember.objects.filter(project_id=project_id,
-                                                user_id=request.user.pk).exists()
+            project_member_exists = ProjectMember.objects.filter(project__tasks__id=task_id,
+                                                                 user_id=request.user.pk).exists()
+            if not project_member_exists:
+                task = Task.objects.filter(id=task_id).first()
+                if task is None:
+                    content = {"task": "Select a valid task."}
+                    raise ValidationError(content)
+            return project_member_exists
         return True
 
     def has_object_permission(self, request, view, obj: Comment):
@@ -164,10 +166,9 @@ class CommentView(CreateModelMixin, ListModelMixin, DestroyModelMixin, GenericVi
     filterset_class = CommentFilter
 
     def get_queryset(self):
-        qs = Comment.objects.select_related(
-            'task',
-            'author'
-        ).order_by('-created_at')
+        if self.action in {'partial_update', 'destroy'}:
+            return Comment.objects.select_related('task').order_by('-created_at')
+        qs = Comment.objects.all().order_by('-created_at')
         return qs
 
     def filter_queryset(self, queryset):

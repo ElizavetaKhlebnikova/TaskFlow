@@ -30,7 +30,7 @@ class TaskFilter(django_filters.FilterSet):
 
 
 class CommentFilter(django_filters.FilterSet):
-    task = django_filters.ModelChoiceFilter(queryset=Task.objects.all(), required=True)
+    task = django_filters.NumberFilter(field_name="task_id", required=True)
 
     class Meta:
         model = Comment

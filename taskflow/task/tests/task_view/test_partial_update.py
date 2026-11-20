@@ -3,6 +3,8 @@ import datetime
 import pytest
 from rest_framework.test import APIClient
 from reversion.models import Version
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from task.models import Project, Status, Priority, Task
 
@@ -26,18 +28,24 @@ def test_partial_update_task_by_manager(task, authenticated_client_manager, user
     deadline = datetime.datetime(year=2026, month=10, day=20, hour=18, tzinfo=datetime.timezone.utc)
     deadline_string = deadline.strftime('%Y-%m-%dT%H:%M:%SZ')
     new_name = "Test task 2"
-    response = authenticated_client_manager.patch(
-        f"/api/task/{task.pk}/",
-        {
-            "name": new_name,
-            "status": Status.DONE,
-            "priority": Priority.HIGH,
-            "description": "new description",
-            "assignee": user_member_assignee.pk,
-            "deadline": deadline_string
-        },
-        format="json"
-    )
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated_client_manager.patch(
+            f"/api/task/{task.pk}/",
+            {
+                "name": new_name,
+                "status": Status.DONE,
+                "priority": Priority.HIGH,
+                "description": "new description",
+                "assignee": user_member_assignee.pk,
+                "deadline": deadline_string
+            },
+            format="json"
+        )
+
+    print(f"Количество запросов: {len(queries)}")
+
+    for query in queries:
+        print(query["sql"])
 
     assert response.status_code == 200
     assert response.data['name'] == new_name

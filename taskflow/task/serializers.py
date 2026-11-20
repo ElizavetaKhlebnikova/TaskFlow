@@ -27,7 +27,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def validate_assignee(self, value):
         """
-        Check that the blog post is about Django.
+        Check that the assignee is project member.
         """
         if self.instance:
             project = self.instance.project

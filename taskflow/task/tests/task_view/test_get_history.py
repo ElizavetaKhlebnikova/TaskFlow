@@ -3,6 +3,8 @@ from datetime import datetime
 import pytest
 from rest_framework.test import APIClient
 from reversion.models import Version
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 
 @pytest.mark.django_db
@@ -60,10 +62,25 @@ def test_task_history_by_author(authenticated_client_member_author, task_with_hi
 
 
 @pytest.mark.django_db
-def test_task_history_by_not_author_or_assignee(authenticated_client_manager, task_with_history):
-    response = authenticated_client_manager.get(
-        f"/api/task/{task_with_history.pk}/history/",
-        format="json"
-    )
+def test_task_history_by_not_author_or_assignee(authenticated_client_manager, task_with_history, authenticated_client_member_author):
+    for _ in range(20):
+        authenticated_client_member_author.patch(
+            f"/api/task/{task_with_history.pk}/",
+            {
+                "name": "Test task 2",
+            },
+            format="json"
+        )
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated_client_manager.get(
+            f"/api/task/{task_with_history.pk}/history/",
+            format="json"
+        )
+
+    print(f"Количество запросов: {len(queries)}")
+
+    for query in queries:
+        print(query["sql"])
 
     assert response.status_code == 200
+    assert len(response.data) == 22

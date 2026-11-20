@@ -1,4 +1,8 @@
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
+from task.models import Task, Priority, Status
 
 
 @pytest.mark.django_db
@@ -7,13 +11,49 @@ def test_list_task_by_manager(authenticated_client_manager,
                               task_todo_medium,
                               task_todo_high,
                               task_planed_high_author_is_assignee):
-    response = authenticated_client_manager.get(
-        f"/api/task/?project={project.pk}",
-        format="json"
-    )
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated_client_manager.get(
+            f"/api/task/?project={project.pk}",
+            format="json"
+        )
 
+    print(f"Количество запросов: {len(queries)}")
+
+    for query in queries:
+        print(query["sql"])
     assert response.status_code == 200
     assert response.data['count'] == 3
+    task_ids = {task['id'] for task in response.data['results']}
+    assert task_ids == {task_todo_medium.pk, task_todo_high.pk, task_planed_high_author_is_assignee.pk}
+
+
+@pytest.mark.django_db
+def test_list_task_20(authenticated_client_manager,
+                      project,
+                      user_member_assignee,
+                      user_member_author):
+    for _ in range(20):
+        Task.objects.create(project=project,
+                            name="Test task 2",
+                            description="-",
+                            assignee=user_member_assignee,
+                            status=Status.TODO,
+                            priority=Priority.MEDIUM,
+                            author=user_member_author
+                            )
+
+    with CaptureQueriesContext(connection) as queries:
+        response = authenticated_client_manager.get(
+            f"/api/task/?project={project.pk}",
+            format="json"
+        )
+
+    print(f"Количество запросов: {len(queries)}")
+
+    for query in queries:
+        print(query["sql"])
+    assert response.status_code == 200
+    assert response.data['count'] == 20
 
 
 @pytest.mark.django_db
@@ -29,6 +69,8 @@ def test_list_task_by_member_author(authenticated_client_member_author,
 
     assert response.status_code == 200
     assert response.data['count'] == 3
+    task_ids = {task['id'] for task in response.data['results']}
+    assert task_ids == {task_todo_medium.pk, task_todo_high.pk, task_planed_high_author_is_assignee.pk}
 
 
 @pytest.mark.django_db
@@ -44,6 +86,8 @@ def test_list_task_by_member_assignee(authenticated_client_member_assignee,
 
     assert response.status_code == 200
     assert response.data['count'] == 3
+    task_ids = {task['id'] for task in response.data['results']}
+    assert task_ids == {task_todo_medium.pk, task_todo_high.pk, task_planed_high_author_is_assignee.pk}
 
 
 @pytest.mark.django_db
